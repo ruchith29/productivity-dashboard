@@ -9,7 +9,12 @@ import Paper from '@mui/material/Paper';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useState } from 'react';
 import { InputForm } from './AddTask'
-import DoneIcon from '@mui/icons-material/Done';
+import { Snackbar, Alert } from "@mui/material";
+import { HeaderComponent } from './HeaderComponent';
+import { useContext } from 'react';
+import { PrevTaskContext, RowsDataContext } from '../GlobalObjects/PrevTasksContext';
+import { UpdatedCellDialog } from './UpdateCell.js';
+import Chip from '@mui/material/Chip';
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
     [`&.${tableCellClasses.head}`]: {
@@ -31,28 +36,112 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
     },
 }));
 
-let data = [
-    createData('Buy groceries', 1, false),
-    createData('Clean the house', 2, true),
-    createData('Finish project report', 3, false),
-];
 
-function createData(task, id, completed) {
-    return { task, id, completed };
+function createData(task, id, completed, startDate, endDate, workingHours, priority, inProgressDate) {
+    return { task, id, completed, startDate, endDate, workingHours, priority, inProgressDate };
 }
 
+const messages = [
+    "Whoa there, overachiever!",
+    "Your to-do list just filed for overtime.",
+    "Even a robot would need a break now.",
+    "You planning world domination or just laundry?",
+    "I hope coffee is part of this plan.",
+    "Relax! Rome wasn’t built in one to-do list.",
+    "Your tasks are forming a union.",
+    "May the productivity gods be with you.",
+    "Time to clone yourself, maybe?",
+    "You're one checkbox away from enlightenment."
+];
+
+
 export function TaskList() {
-    let [rows, setRows] = useState(data);
+
+    // global object access
+    const { addPrevTask } = useContext(PrevTaskContext);
+    const { allRows, addRow, deleteRow, setAllRows } = useContext(RowsDataContext);
+
+    let [snackBarOpen, setSnackbarOpen] = useState(false);
+    let [snackbarMessage, setSnackbarMessage] = useState("");
+    let [snackbarSeverity, setSnackbarSeverity] = useState("");
+
+
+
+    function getRandomMessage() {
+        const randomIndex = Math.floor(Math.random() * messages.length);
+        return messages[randomIndex];
+    }
+
+    function getCurrentTime() {
+        const currentDate = new Date();
+        return currentDate.toDateString() + ' ' + currentDate.toLocaleTimeString();
+    }
 
     const appendTask = (data) => {
-        const index = rows[rows.length - 1].id;
-        const row = createData(data, index + 1, false)
 
-        setRows(() => { return [...rows, row] })
+        if (allRows.length === 5) {
+            // show a snack bar
+            showSnackbar(getRandomMessage(), "error");
+        }
+        else {
+
+            // null checks
+            if (data.description.trim() === '') {
+                showSnackbar("Cool task! But... what is it?", "error");
+                return;
+            }
+            if (data.priority === '') {
+                alert("Priority? Never heard of her ");
+                return;
+            }
+
+            const index = allRows.length === 0 ? 0 : allRows[allRows.length - 1].id;
+            const row = createData(data.description, index + 1, "Yet to Start", getCurrentTime(), "", "", data.priority, "")
+            addRow(row)
+            setAllRows(() => { return [...allRows, row] })
+            showSnackbar("Task Added", "success");
+        }
+    }
+
+    const showSnackbar = (message, severity) => {
+        setSnackbarMessage(message);
+        setSnackbarSeverity(severity);
+        setSnackbarOpen(true);
+    };
+
+    function getTimeDifferenceInHours(startDate, endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        const diffMs = end - start;
+
+        if (isNaN(diffMs)) {
+            return null;
+        }
+
+        const diffHours = diffMs / (1000 * 60 * 60);
+        return diffHours.toFixed(4);
     }
 
     return (
         <>
+            <HeaderComponent></HeaderComponent>
+            <Snackbar
+                open={snackBarOpen}
+                autoHideDuration={3000}
+                onClose={() => setSnackbarOpen(false)}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                style={{ zIndex: +9999, marginTop: "30px" }}
+            >
+                <Alert
+                    onClose={() => setSnackbarOpen(false)}
+                    severity={snackbarSeverity}
+                    sx={{ width: "100%" }}
+                >
+                    {snackbarMessage}
+                </Alert>
+            </Snackbar>
+
             <InputForm appendTask={appendTask}></InputForm>
 
             <TableContainer component={Paper}>
@@ -68,17 +157,25 @@ export function TaskList() {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {rows.length === 0 ? <span style={{ fontSize: "20px" }}>No tasks</span> : rows.map((row) => (
-                            <StyledTableRow key={row.id} style={{
-                                opacity: row.completed ? 0.5 : 1,
-                                pointerEvents: row.completed ? "none" : "auto"
-                            }}>
+                        {allRows.length === 0 ? (
+                            <StyledTableRow>
+                                <StyledTableCell colSpan={5} align="center" style={{ fontSize: "18px" }}>
+                                    No tasks
+                                </StyledTableCell>
+                            </StyledTableRow>
+                        ) : allRows.map((row) => (
+                            <StyledTableRow key={row.id} >
                                 <StyledTableCell>{row.id}</StyledTableCell>
                                 <StyledTableCell component="th" scope="row">{row.task}</StyledTableCell>
-                                <StyledTableCell>{row.completed ? "Completed" : "Pending"}</StyledTableCell>
+                                <StyledTableCell>    <Chip
+                                    label={row.completed}
+                                    color={row.completed === 'In Progress' ? 'warning' :
+                                        row.completed === 'Blocked' ? 'error' : 'success'}
+                                    size="small"
+                                /></StyledTableCell>
                                 <StyledTableCell onClick={() => { deleteTask(row.id) }}><DeleteOutlineIcon /></StyledTableCell>
-                                <StyledTableCell onClick={() => { updateTask(row.id) }} >
-                                    {row.completed ? "" : <DoneIcon />}
+                                <StyledTableCell  >
+                                    <UpdatedCellDialog row={row} />
                                 </StyledTableCell>
                             </StyledTableRow>
                         ))}
@@ -89,73 +186,21 @@ export function TaskList() {
 
     );
 
-    function updateTask(updateId) {
-        console.log(updateId)
-        rows = rows.map((row) => {
-            if (row.id === updateId) {
-                return { ...row, completed: true };
-            }
-            return row;
-        })
-        console.log(rows)
-        setRows(() => { return [...rows] })
-    }
 
     function deleteTask(deleteId) {
-        rows = rows.filter(({ task, id, completed }) => {
-            return id !== deleteId;
-        })
-        setRows(() => { return [...rows] })
+        const updatedRows = allRows.filter((row) => {
+            if (row.id === deleteId) {
+                row.endDate = getCurrentTime();
+                row.workingHours = row.inProgressDate === '' ? '0.0000' : getTimeDifferenceInHours(row.inProgressDate, getCurrentTime());
+                const updatedRow = { ...row, completed: 'Skipped' };
+                deleteRow(row.id);
+                addPrevTask(updatedRow);
+                return false;
+            }
+            return true;
+        });
+        setAllRows(updatedRows);
     }
 
 
 }
-
-// import React from "react";
-// import "../Styles/TaskList.css"
-
-// export function TaskList() {
-//     const data = [
-//         {
-//             "id": 1,
-//             "task": "Buy groceries",
-//             "completed": false
-//         },
-//         {
-//             "id": 2,
-//             "task": "Clean the house",
-//             "completed": true
-//         },
-//         {
-//             "id": 3,
-//             "task": "Finish project report",
-//             "completed": false
-//         }
-//     ]
-
-//     return (<div className="task-list-container">
-
-//         <h3>Task List</h3>
-//         <div className="list-header">
-//             <p>ID</p>
-//             <p>Task</p>
-//             <p>Status</p>
-//         </div>
-//         <ul>
-//             {data.map(({ id, task, completed }) => {
-//                 console.log(id);
-
-//                 return (
-//                     <li key={id} className="list-container">
-//                         <p>{id}</p>
-//                         <p>{task}</p>
-//                         <span>{completed ? "Finished" : "Pending"}</span>
-//                     </li>
-//                 );
-//             }
-//             )}
-
-//         </ul>
-
-//     </div>);
-// }

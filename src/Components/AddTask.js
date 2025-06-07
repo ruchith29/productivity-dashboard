@@ -7,9 +7,11 @@ import "../Styles/addTask.css";
 
 export function InputForm({ appendTask }) {
     const [description, setDescription] = useState("");
+    const [priority, setPriority] = useState("");
 
-    function addTask(description, appendTask) {
-        appendTask(description);
+
+    function addTask(task, appendTask) {
+        appendTask(task);
     }
 
     return (
@@ -28,12 +30,34 @@ export function InputForm({ appendTask }) {
                     label="Task Description"
                     placeholder=""
                     multiline
+                    value={description}
                     onChange={(event) => {
                         setDescription(event.target.value)
 
                     }}
+                    style={{ width: '800px' }}
                 />
-                <Button onClick={() => { addTask(description, appendTask) }} variant="contained" color="success"> Add Task </Button>
+                <div className='task-priority'>
+                    <p>Assign a priority to receive relevant updates and reminders.**</p>
+                    <label>
+                        <input type='radio' name='priority' value='high' onClick={() => setPriority("high")} />
+                        High Priority
+                    </label>
+                    <label>
+                        <input type='radio' name='priority' value='medium' onClick={() => setPriority("medium")} />
+                        Medium Priority
+                    </label>
+                    <label>
+                        <input type='radio' name='priority' value='low' onClick={() => setPriority("low")} />
+                        Low Priority
+                    </label>
+                </div>
+                <Button onClick={() => {
+                    const task = { description: description, priority: priority }
+                    addTask(task, appendTask)
+                    setDescription('');
+                }}
+                    variant="contained" color="success"> Add Task </Button>
             </div>
         </Box>
     );
